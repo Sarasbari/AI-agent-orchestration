@@ -19,6 +19,10 @@ const config = {
   // Redis (Week 2)
   REDIS_HOST: process.env.REDIS_HOST || 'localhost',
   REDIS_PORT: parseInt(process.env.REDIS_PORT, 10) || 6379,
+
+  // LLM APIs (Week 2)
+  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
 
 module.exports = config;
