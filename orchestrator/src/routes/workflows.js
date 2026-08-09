@@ -1,6 +1,7 @@
 const express = require('express');
 const authenticate = require('../middleware/authenticate');
 const workflowService = require('../services/workflowService');
+const runService = require('../services/runService');
 const { createWorkflowSchema, updateWorkflowSchema } = require('../validators/workflowSchema');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -56,6 +57,17 @@ router.put(
     const fields = updateWorkflowSchema.parse(req.body);
     const workflow = await workflowService.update(req.params.id, req.user.id, fields);
     res.json(workflow);
+  }),
+);
+
+/**
+ * POST /api/workflows/:id/run — Trigger a new execution run of the workflow.
+ */
+router.post(
+  '/:id/run',
+  asyncHandler(async (req, res) => {
+    const run = await runService.triggerRun(req.params.id, req.user.id);
+    res.status(202).json(run); // 202 Accepted, execution is async
   }),
 );
 
