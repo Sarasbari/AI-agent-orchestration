@@ -33,6 +33,22 @@ const runModel = {
   async getRunById(runId) {
     const result = await query(`SELECT * FROM workflow_runs WHERE id = $1`, [runId]);
     return result.rows[0];
+  },
+
+  async getRunsByWorkflowId(workflowId) {
+    const result = await query(
+      `SELECT * FROM workflow_runs WHERE workflow_id = $1 ORDER BY created_at DESC`,
+      [workflowId]
+    );
+    return result.rows;
+  },
+
+  async getNodeExecutionsByRunId(runId) {
+    const result = await query(
+      `SELECT * FROM node_executions WHERE run_id = $1 ORDER BY started_at ASC NULLS LAST`,
+      [runId]
+    );
+    return result.rows;
   }
 };
 

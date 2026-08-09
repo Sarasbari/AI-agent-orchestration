@@ -41,10 +41,12 @@ app.get('/ready', async (_req, res) => {
 // --- API routes ---
 const authRoutes = require('./routes/auth');
 const workflowRoutes = require('./routes/workflows');
+const runRoutes = require('./routes/runs');
 const keyRoutes = require('./routes/keys');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/workflows', workflowRoutes);
+app.use('/api/runs', runRoutes);
 app.use('/api/keys', keyRoutes);
 
 // --- Global error handler ---

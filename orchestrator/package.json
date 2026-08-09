@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon --require dotenv/config server.js",
     "worker": "nodemon --require dotenv/config worker.js",
+    "start:worker": "npm run worker",
     "start": "node server.js",
     "test": "jest --coverage --forceExit --detectOpenHandles",
     "migrate:up": "node scripts/migrate.js up",

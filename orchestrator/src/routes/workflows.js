@@ -83,4 +83,18 @@ router.delete(
   }),
 );
 
+/**
+ * GET /api/workflows/:id/runs
+ * Fetch the run history for a workflow
+ */
+router.get(
+  '/:id/runs',
+  asyncHandler(async (req, res) => {
+    const workflow = await workflowService.getById(req.params.id, req.user.id);
+    const runModel = require('../models/runModel');
+    const runs = await runModel.getRunsByWorkflowId(workflow.id);
+    res.json(runs);
+  })
+);
+
 module.exports = router;
