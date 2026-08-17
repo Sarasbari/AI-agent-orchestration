@@ -60,6 +60,7 @@ const errorHandler = (err, _req, res, _next) => {
   // Unhandled errors — don't leak internals
   const logger = require('../logger');
   logger.error({ err }, 'Unhandled error');
+  console.error('DEBUG TEST ERROR:', err);
 
   return res.status(500).json({
     error: {

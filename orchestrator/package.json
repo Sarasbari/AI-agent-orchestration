@@ -15,6 +15,7 @@
     "format": "prettier --write \"src/**/*.js\""
   },
   "dependencies": {
+    "@clerk/express": "^2.1.57",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "bullmq": "^6.0.9",
