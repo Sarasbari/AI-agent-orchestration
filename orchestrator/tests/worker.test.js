@@ -18,6 +18,16 @@ jest.mock('groq-sdk', () => {
   });
 });
 
+jest.mock('../src/db/pool', () => ({
+  query: jest.fn().mockResolvedValue({
+    rows: [{ provider: 'groq', encrypted_key: 'mock-encrypted-groq' }]
+  })
+}));
+
+jest.mock('../src/services/encryptionService', () => ({
+  decrypt: jest.fn().mockReturnValue('mock-decrypted-key')
+}));
+
 describe('Worker Node Execution Logic', () => {
   describe('Condition Node', () => {
     it('evaluates true condition correctly', async () => {
@@ -65,7 +75,7 @@ describe('Worker Node Execution Logic', () => {
     it('returns mocked Groq response by default', async () => {
       const config = { prompt: 'Hello {{n1}}' };
       const inputs = { n1: { result: 'World' } };
-      const output = await llmNode.execute(config, inputs);
+      const output = await llmNode.execute(config, inputs, 'user-1');
       
       expect(output.provider).toBe('groq');
       expect(output.result).toBe('Mocked Groq Response');

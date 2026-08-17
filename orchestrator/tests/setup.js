@@ -26,3 +26,20 @@ jest.mock('bullmq', () => ({
     close: jest.fn().mockResolvedValue()
   }))
 }));
+
+// Mock Clerk express middleware
+jest.mock('@clerk/express', () => ({
+  requireAuth: () => (req, res, next) => {
+    // If no authorization header is present at all, simulate a 401 for tests that expect it
+    if (!req.headers.authorization) {
+      return res.status(401).json({ error: { message: 'Unauthorized' } });
+    }
+    req.auth = { userId: 'user-1' };
+    next();
+  }
+}));
+
+// Mock userModel so authenticate middleware doesn't consume DB mocks
+jest.mock('../src/models/userModel', () => ({
+  upsertUser: jest.fn().mockResolvedValue({ id: 'user-1', email: 'user-1@placeholder.com' })
+}));
