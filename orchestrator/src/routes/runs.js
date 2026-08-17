@@ -83,4 +83,59 @@ router.get('/:id/stream', verifyRunOwnership, (req, res) => {
   });
 });
 
+/**
+ * POST /api/runs/:id/nodes/:nodeId/retry
+ * Retry a failed node execution
+ */
+router.post('/:id/nodes/:nodeId/retry', verifyRunOwnership, asyncHandler(async (req, res) => {
+  const { id: runId } = req.params;
+  const { nodeId } = req.params;
+  
+  // 1. Verify node execution exists and is failed
+  const nodeExec = await runModel.getNodeExecution(runId, nodeId);
+  if (!nodeExec) {
+    throw new AppError('Node execution not found', 404);
+  }
+  if (nodeExec.status !== 'failed') {
+    throw new AppError(`Cannot retry node with status "${nodeExec.status}". Only failed nodes can be retried.`, 400);
+  }
+
+  // 2. Get the workflow DAG to find the node config
+  const workflow = await workflowModel.findById(req.run.workflow_id);
+  const dag = workflow.dag_definition;
+  const dagNode = dag.nodes.find(n => n.id === nodeId);
+  if (!dagNode) {
+    throw new AppError('Node not found in workflow DAG definition', 404);
+  }
+
+  // 3. Reset node execution status to pending
+  await runModel.resetNodeExecution(runId, nodeId);
+
+  // 4. If the run itself was failed, re-open it
+  const { query } = require('../db/pool');
+  if (req.run.status === 'failed') {
+    await query(
+      `UPDATE workflow_runs SET status = 'running', completed_at = NULL, error = NULL WHERE id = $1`,
+      [runId]
+    );
+  }
+
+  // 5. Re-enqueue to BullMQ
+  const { executeNodeQueue } = require('../services/queueService');
+  await executeNodeQueue.add('execute', {
+    runId,
+    nodeId: dagNode.id,
+    nodeType: dagNode.type,
+    nodeConfig: dagNode.config,
+    userId: req.user.id
+  }, {
+    jobId: `${runId}-${dagNode.id}-retry-${Date.now()}`,
+    attempts: 4,
+    backoff: { type: 'exponential', delay: 2000 }
+  });
+
+  res.json({ message: 'Node retry enqueued', nodeId });
+}));
+
 module.exports = router;
+

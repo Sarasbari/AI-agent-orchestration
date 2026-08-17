@@ -49,6 +49,25 @@ const runModel = {
       [runId]
     );
     return result.rows;
+  },
+
+  async getNodeExecution(runId, nodeId) {
+    const result = await query(
+      `SELECT * FROM node_executions WHERE run_id = $1 AND node_id = $2`,
+      [runId, nodeId]
+    );
+    return result.rows[0];
+  },
+
+  async resetNodeExecution(runId, nodeId) {
+    const result = await query(
+      `UPDATE node_executions 
+       SET status = 'pending', error = NULL, output = NULL, started_at = NULL, completed_at = NULL, retry_count = 0
+       WHERE run_id = $1 AND node_id = $2
+       RETURNING *`,
+      [runId, nodeId]
+    );
+    return result.rows[0];
   }
 };
 

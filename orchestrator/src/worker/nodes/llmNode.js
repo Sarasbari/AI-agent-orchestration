@@ -1,21 +1,34 @@
 const Groq = require('groq-sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const config = require('../../config');
 const logger = require('../../logger');
-
-// Initialize Groq
-const groq = config.GROQ_API_KEY ? new Groq({ apiKey: config.GROQ_API_KEY }) : null;
-
-// Initialize Gemini
-const genAI = config.GEMINI_API_KEY ? new GoogleGenerativeAI(config.GEMINI_API_KEY) : null;
+const { query } = require('../../db/pool');
+const encryptionService = require('../../services/encryptionService');
 
 const llmNode = {
-  async execute(config, inputs) {
-    // We expect config.prompt to contain the prompt text.
-    // We can replace templated variables from inputs like {{inputKey}}
-    let prompt = config.prompt || '';
+  async execute(config, inputs, userId) {
+    // 1. Fetch user API keys
+    const keysResult = await query(
+      `SELECT provider, encrypted_key FROM api_keys WHERE user_id = $1 AND provider IN ('groq', 'gemini')`,
+      [userId]
+    );
     
-    // Simple template replacement
+    let groqKey = null;
+    let geminiKey = null;
+    
+    for (const row of keysResult.rows) {
+      try {
+        if (row.provider === 'groq') {
+          groqKey = encryptionService.decrypt(row.encrypted_key);
+        } else if (row.provider === 'gemini') {
+          geminiKey = encryptionService.decrypt(row.encrypted_key);
+        }
+      } catch (err) {
+        logger.error({ err: err.message, provider: row.provider }, 'Failed to decrypt API key');
+      }
+    }
+
+    // 2. Format prompt
+    let prompt = config.prompt || '';
     for (const [key, val] of Object.entries(inputs)) {
       if (val && typeof val.result === 'string') {
         prompt = prompt.replace(new RegExp(`{{${key}}}`, 'g'), val.result);
@@ -24,10 +37,12 @@ const llmNode = {
       }
     }
 
+    // 3. Try Groq first
     try {
-      logger.info('Calling Groq LLM API');
-      if (!groq) throw new Error('GROQ_API_KEY is not configured');
+      logger.info({ userId }, 'Calling Groq LLM API');
+      if (!groqKey) throw new Error('User has not configured a Groq API key');
 
+      const groq = new Groq({ apiKey: groqKey });
       const chatCompletion = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
         model: 'llama-3.3-70b-versatile',
@@ -38,12 +53,13 @@ const llmNode = {
         provider: 'groq'
       };
     } catch (groqError) {
-      logger.warn({ err: groqError.message }, 'Groq API call failed. Falling back to Gemini.');
+      logger.warn({ err: groqError.message, userId }, 'Groq API call failed. Falling back to Gemini.');
 
-      // Fallback circuit breaker
+      // 4. Fallback to Gemini
       try {
-        if (!genAI) throw new Error('GEMINI_API_KEY is not configured');
+        if (!geminiKey) throw new Error('User has not configured a Gemini API key');
         
+        const genAI = new GoogleGenerativeAI(geminiKey);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -55,7 +71,7 @@ const llmNode = {
           fallback_triggered: true
         };
       } catch (geminiError) {
-        logger.error({ err: geminiError.message }, 'Gemini fallback also failed');
+        logger.error({ err: geminiError.message, userId }, 'Gemini fallback also failed');
         throw new Error(`LLM Call failed on both providers. Groq: ${groqError.message}, Gemini: ${geminiError.message}`);
       }
     }

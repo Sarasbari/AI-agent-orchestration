@@ -7,7 +7,7 @@ const logger = require('../logger');
  * Processor for the execute-node job
  */
 const processNodeExecution = async (job) => {
-  const { runId, nodeId, nodeType, nodeConfig } = job.data;
+  const { runId, nodeId, nodeType, nodeConfig, userId } = job.data;
   
   logger.info({ runId, nodeId, nodeType, attempt: job.attemptsMade }, 'Processing node execution');
   
@@ -51,7 +51,7 @@ const processNodeExecution = async (job) => {
     }
 
     // 2. Dispatch based on nodeType
-    const output = await nodeDispatcher.execute(nodeType, nodeConfig, inputs);
+    const output = await nodeDispatcher.execute(nodeType, nodeConfig, inputs, userId);
 
     // 3. Mark node as COMPLETED with output
     await query(
@@ -86,7 +86,8 @@ const processNodeExecution = async (job) => {
           runId,
           nodeId: nextNode.id,
           nodeType: nextNode.type,
-          nodeConfig: nextNode.config
+          nodeConfig: nextNode.config,
+          userId
         }, {
           jobId: `${runId}-${nextNode.id}`,
           attempts: 4,

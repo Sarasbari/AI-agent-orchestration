@@ -44,7 +44,8 @@ const runService = {
         runId: run.id,
         nodeId: node.id,
         nodeType: node.type,
-        nodeConfig: node.config // the configuration for the node
+        nodeConfig: node.config, // the configuration for the node
+        userId: userId
       }, {
         jobId: `${run.id}-${node.id}`, // Prevent duplicate enqueues
         attempts: 4, // 1 initial + 3 retries
