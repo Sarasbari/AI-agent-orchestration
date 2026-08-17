@@ -17,7 +17,7 @@ const edgeSchema = z.object({
 });
 
 const dagDefinitionSchema = z.object({
-  nodes: z.array(nodeSchema).min(1, 'Workflow must have at least one node'),
+  nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema).default([]),
 });
 
