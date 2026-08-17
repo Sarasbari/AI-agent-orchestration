@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ReactFlow,
@@ -15,7 +16,7 @@ import '@xyflow/react/dist/style.css';
 import apiClient from '../api/client';
 import { Play, Save, History, Plus } from 'lucide-react';
 import ConfigPanels from '../components/ConfigPanels';
-import { useAuthStore } from '../store/authStore';
+import { useAuth } from '@clerk/clerk-react';
 
 export default function WorkflowEditor() {
   const { id } = useParams();
@@ -30,7 +31,7 @@ export default function WorkflowEditor() {
   const [activeRunId, setActiveRunId] = useState(null);
   const [nodeStatuses, setNodeStatuses] = useState({}); // { nodeId: 'running'|'completed'|'failed' }
   const sseRef = useRef(null);
-  const token = useAuthStore(state => state.token);
+  const { getToken } = useAuth();
 
   useEffect(() => {
     fetchWorkflow();
@@ -50,13 +51,27 @@ export default function WorkflowEditor() {
 
   const fetchWorkflow = async () => {
     try {
-      const res = await apiClient.get(`/workflows`);
-      const wf = res.data.find(w => w.id === id);
+      const res = await apiClient.get(`/workflows/${id}`);
+      const wf = res.data;
       if (wf) {
         setWorkflow(wf);
         if (wf.dag_definition) {
-          setNodes(wf.dag_definition.nodes || []);
-          setEdges(wf.dag_definition.edges || []);
+          // Restore React Flow position data alongside backend node data
+          const rfNodes = (wf.dag_definition.nodes || []).map((n, i) => ({
+            id: n.id,
+            type: 'default',
+            position: n.position || { x: 100 + i * 200, y: 150 },
+            data: { label: `${n.type} node`, type: n.type, config: n.config || {} }
+          }));
+          const rfEdges = (wf.dag_definition.edges || []).map(e => ({
+            id: `${e.source}-${e.target}`,
+            source: e.source,
+            target: e.target,
+            label: e.label,
+            markerEnd: { type: MarkerType.ArrowClosed }
+          }));
+          setNodes(rfNodes);
+          setEdges(rfEdges);
         }
       }
     } catch (e) {
@@ -85,7 +100,8 @@ export default function WorkflowEditor() {
       const backendNodes = nodes.map(n => ({
         id: n.id,
         type: n.data.type,
-        config: n.data.config || {}
+        config: n.data.config || {},
+        position: n.position
       }));
       
       const backendEdges = edges.map(e => ({
@@ -117,39 +133,41 @@ export default function WorkflowEditor() {
     }
   };
 
-  const connectSSE = (runId) => {
+  const connectSSE = async (runId) => {
     if (sseRef.current) sseRef.current.close();
     
-    // We append token in URL since EventSource can't set headers easily in browser
-    // Wait, standard EventSource doesn't support Authorization header.
-    // For this local prototype, we will use a polyfill or fetch-based SSE, 
-    // or just pass token as query param if the backend supported it. 
-    // Wait! A quick workaround is to use fetch for polling, or if the backend only checks header, 
-    // we need `fetchEventSource` library or just interval polling.
-    // Since backend expects `Authorization: Bearer`, we'll do manual polling here for simplicity without an external library.
+    const abortController = new AbortController();
+    const token = await getToken();
     
-    const interval = setInterval(async () => {
-      try {
-        const res = await apiClient.get(`/runs/${runId}`);
-        const { run, nodes: execNodes } = res.data;
-        
-        const newStatuses = {};
-        execNodes.forEach(n => {
-          newStatuses[n.node_id] = n.status;
-        });
-        setNodeStatuses(newStatuses);
-        
-        if (run.status !== 'running') {
-          clearInterval(interval);
-          if (run.status === 'failed') alert('Run failed');
-          else alert('Run completed!');
+    fetchEventSource(`http://localhost:3000/api/runs/${runId}/stream`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      signal: abortController.signal,
+      onmessage(event) {
+        try {
+          const { run, nodes: execNodes } = JSON.parse(event.data);
+          const newStatuses = {};
+          execNodes.forEach(n => {
+            newStatuses[n.node_id] = n.status;
+          });
+          setNodeStatuses(newStatuses);
+          
+          if (run.status !== 'running') {
+            abortController.abort();
+          }
+        } catch (e) {
+          console.error('SSE parse error:', e);
         }
-      } catch (e) {
-        clearInterval(interval);
-      }
-    }, 1000);
+      },
+      onerror(err) {
+        console.error('SSE connection error:', err);
+        abortController.abort();
+      },
+    });
     
-    sseRef.current = { close: () => clearInterval(interval) };
+    sseRef.current = { close: () => abortController.abort() };
   };
 
   // Color nodes based on status

@@ -4,7 +4,7 @@ import { Plus, Play, Clock, Edit } from 'lucide-react';
 import apiClient from '../api/client';
 
 export default function Dashboard() {
-  const [workflows, setWorkflows] = String(null) ? [] : []; // initialized to [] below
+  const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [list, setList] = useState([]);
   const navigate = useNavigate();

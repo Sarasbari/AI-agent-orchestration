@@ -53,21 +53,26 @@ export default function RunHistory() {
           ) : (
             runs.map((run) => (
               <li key={run.id}>
-                <div className="px-6 py-4 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <p className="text-sm font-medium text-gray-900 truncate flex items-center mb-1">
-                      Run: <span className="font-mono ml-2 text-xs text-gray-500">{run.id}</span>
-                    </p>
-                    <p className="flex items-center text-sm text-gray-500">
-                      <Clock size={14} className="mr-1" />
-                      Started: {new Date(run.started_at).toLocaleString()}
-                    </p>
+                <Link 
+                  to={`/workflows/${id}/runs/${run.id}`}
+                  className="block px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <p className="text-sm font-medium text-gray-900 truncate flex items-center mb-1">
+                        Run: <span className="font-mono ml-2 text-xs text-gray-500">{run.id}</span>
+                      </p>
+                      <p className="flex items-center text-sm text-gray-500">
+                        <Clock size={14} className="mr-1" />
+                        Started: {new Date(run.started_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className="mb-2">{getStatusBadge(run.status)}</div>
+                      {run.error && <p className="text-xs text-red-600 max-w-xs truncate" title={run.error}>{run.error}</p>}
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <div className="mb-2">{getStatusBadge(run.status)}</div>
-                    {run.error && <p className="text-xs text-red-600 max-w-xs truncate" title={run.error}>{run.error}</p>}
-                  </div>
-                </div>
+                </Link>
               </li>
             ))
           )}

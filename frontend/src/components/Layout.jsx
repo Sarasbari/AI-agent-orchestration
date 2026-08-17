@@ -1,20 +1,10 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
-import { LayoutDashboard, Settings, LogOut, Network } from 'lucide-react';
-import apiClient from '../api/client';
+import { LayoutDashboard, Settings, Network } from 'lucide-react';
+import { UserButton, useUser } from '@clerk/clerk-react';
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
   const location = useLocation();
-
-  const handleLogout = async () => {
-    try {
-      await apiClient.post('/auth/logout');
-    } catch (e) {
-      console.error(e);
-    }
-    logout();
-  };
+  const { user } = useUser();
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -53,16 +43,7 @@ export default function Layout() {
         
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="ml-2 p-2 text-gray-400 hover:text-red-600 rounded-md hover:bg-gray-100"
-              title="Logout"
-            >
-              <LogOut size={18} />
-            </button>
+            <UserButton showName />
           </div>
         </div>
       </div>
